@@ -49,14 +49,17 @@ const SendData = async (req: NextApiRequest, res: NextApiResponse) => {
 
 						const userOwner = await auth.getUser(parkingData?.owner)
 
-						await sendNotification({
-							adminToken: userAdminNotificationToken,
-							userToken: parkingData?.user_token,
-							parking_lot_name: parkingData?.name,
-							parking_place_id: parkingData?.parking_place,
-							user_id: parkingData?.owner,
-							user_email: userOwner.email || '',
-						})
+						if (!parkingData?.notificationSent) {
+							await sendNotification({
+								adminToken: userAdminNotificationToken,
+								userToken: parkingData?.user_token,
+								parking_lot_name: parkingData?.name,
+								parking_place_id: parkingData?.parking_place,
+								user_id: parkingData?.owner,
+								user_email: userOwner.email || '',
+								ParkingID,
+							})
+						}
 					}
 				}
 
@@ -66,6 +69,7 @@ const SendData = async (req: NextApiRequest, res: NextApiResponse) => {
 						date_of_parking: firestore.FieldValue.delete(),
 						password: firestore.FieldValue.delete(),
 						user_token: firestore.FieldValue.delete(),
+						notificationSent: firestore.FieldValue.delete(),
 						available: true,
 					})
 				}
@@ -80,14 +84,17 @@ const SendData = async (req: NextApiRequest, res: NextApiResponse) => {
 
 					const userOwner = await auth.getUser(parkingData?.owner)
 
-					await sendNotification({
-						adminToken: userAdminNotificationToken,
-						userToken: parkingData?.user_token,
-						parking_lot_name: parkingData?.name,
-						parking_place_id: parkingData?.parking_place,
-						user_id: parkingData?.owner,
-						user_email: userOwner.email || '',
-					})
+					if (!parkingData?.notificationSent) {
+						await sendNotification({
+							adminToken: userAdminNotificationToken,
+							userToken: parkingData?.user_token,
+							parking_lot_name: parkingData?.name,
+							parking_place_id: parkingData?.parking_place,
+							user_id: parkingData?.owner,
+							user_email: userOwner.email || '',
+							ParkingID,
+						})
+					}
 				}
 			}
 
@@ -108,6 +115,7 @@ const sendNotification = async ({
 	parking_place_id,
 	user_id,
 	user_email,
+	ParkingID,
 }: {
 	adminToken: string
 	userToken: string
@@ -115,6 +123,7 @@ const sendNotification = async ({
 	parking_place_id: string
 	user_id: string
 	user_email: string
+	ParkingID: string
 }) => {
 	try {
 		const parkingPlaceDocument = await db
@@ -133,6 +142,7 @@ const sendNotification = async ({
 			admin_message,
 			parking_lot_name,
 			parking_place_name: parkingPlaceData?.name,
+			createdAt: new Date(),
 		})
 
 		await fetch('https://exp.host/--/api/v2/push/send', {
@@ -155,6 +165,11 @@ const sendNotification = async ({
 				_displayInForeground: true,
 			}),
 		})
+
+		await db
+			.collection('parking_lots')
+			.doc(ParkingID)
+			.update({ notificationSent: true })
 	} catch (error) {
 		console.error(error)
 	}
